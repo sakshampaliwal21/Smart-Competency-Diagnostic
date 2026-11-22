@@ -1,0 +1,61 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String       @id @default(uuid()) @db.Uuid
+  name       String
+  email      String       @unique
+  password   String
+  createdAt  DateTime     @default(now())
+  profile    Profile?
+  assessments Assessment[]
+}
+
+model Profile {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid
+  education String?
+  skills    String[] @default([])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Question {
+  id            Int      @id @default(autoincrement())
+  category      String
+  question      String
+  options       String[]
+  correctAnswer Int
+  answers       AssessmentAnswer[]
+}
+
+model Assessment {
+  id         String             @id @default(uuid()) @db.Uuid
+  userId     String             @db.Uuid
+  totalScore Float              @default(0)
+  createdAt  DateTime           @default(now())
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers    AssessmentAnswer[]
+}
+
+model AssessmentAnswer {
+  id             Int        @id @default(autoincrement())
+  assessmentId   String     @db.Uuid
+  questionId     Int
+  selectedOption Int
+  isCorrect      Boolean
+  assessment     Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  question       Question   @relation(fields: [questionId], references: [id])
+}
