@@ -1,4 +1,4 @@
-
+const profileRoutes = require("./profile");
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
@@ -9,6 +9,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use("/api/profile", profileRoutes);
 
 app.get("/", (req, res) => {
   res.json({
