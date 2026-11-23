@@ -185,4 +185,118 @@ router.post("/submit", authMiddleware, async (req, res) => {
   }
 });
 
+
+// GET LATEST CANDIDATE COMPETENCY REPORT
+router.get("/report", authMiddleware, async (req, res) => {
+  try {
+    const assessment = await prisma.assessment.findFirst({
+      where: { userId: req.userId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+            profile: {
+              select: {
+                education: true,
+                skills: true
+              }
+            }
+          }
+        },
+        answers: {
+          include: {
+            question: {
+              select: {
+                category: true,
+                question: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!assessment) {
+      return res.status(404).json({
+        message: "No assessment found. Please complete an assessment first."
+      });
+    }
+
+    const categoryData = {};
+
+    for (const answer of assessment.answers) {
+      const category = answer.question.category;
+
+      if (!categoryData[category]) {
+        categoryData[category] = {
+          totalQuestions: 0,
+          correctAnswers: 0
+        };
+      }
+
+      categoryData[category].totalQuestions++;
+
+      if (answer.isCorrect) {
+        categoryData[category].correctAnswers++;
+      }
+    }
+
+    const categoryScores = {};
+
+    for (const category in categoryData) {
+      const data = categoryData[category];
+
+      categoryScores[category] = {
+        totalQuestions: data.totalQuestions,
+        correctAnswers: data.correctAnswers,
+        score: Number(
+          ((data.correctAnswers / data.totalQuestions) * 100).toFixed(2)
+        )
+      };
+    }
+
+    const skillGaps = Object.keys(categoryScores).filter(
+      category => categoryScores[category].score < 60
+    );
+
+    let competencyLevel;
+
+    if (assessment.totalScore < 40) {
+      competencyLevel = "Beginner";
+    } else if (assessment.totalScore < 75) {
+      competencyLevel = "Intermediate";
+    } else {
+      competencyLevel = "Advanced";
+    }
+
+    res.json({
+      candidate: {
+        name: assessment.user.name,
+        email: assessment.user.email,
+        education: assessment.user.profile?.education || "Not added",
+        skills: assessment.user.profile?.skills || []
+      },
+      assessment: {
+        id: assessment.id,
+        date: assessment.createdAt,
+        totalQuestions: assessment.answers.length,
+        correctAnswers: assessment.answers.filter(a => a.isCorrect).length,
+        overallScore: assessment.totalScore,
+        competencyLevel
+      },
+      categoryScores,
+      skillGaps
+    });
+
+  } catch (error) {
+    console.error("Report error:", error);
+
+    res.status(500).json({
+      message: "Failed to generate competency report"
+    });
+  }
+});
+
 module.exports = router;
